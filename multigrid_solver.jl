@@ -120,7 +120,7 @@ begin
 
 	A function that returns the Anisotropic probem's linear operator.
 	"""
-	function A₂(n)
+	function A₂(n::Int, ϵ::Float64)
 		∂² 	= Tridiagonal(ones(n-1), -2 * ones(n), ones(n-1))
 		∂x² = (n^2) * kron(sparse(∂²), I(n))	# kron is the Kronecker product
 		∂y² = (n^2) * kron(I(n), sparse(∂²))	# h is the unit of displacement
@@ -134,7 +134,7 @@ begin
 	This variant takes the ϵ value as input to construct an A₂ operator constructor that only takes the differentiable matrix dimension as input.
 	"""
 	function A₂(ϵ::Float64)
-		return n -> A₁(n, ϵ)
+		return n -> A₂(n, ϵ)
 	end
 end ;
 
@@ -160,7 +160,10 @@ function boundaries(grid)
 end ;
 
 # ╔═╡ e2f0fef8-584e-11eb-2f0c-49b4cb4009ba
-md"""For the stationary smoothers, we're each time choosing one of the defined functions below either to be used on its own for comparison or to use it as the smoother in our Multigrid implementation.
+md"""
+**Constructing the solvers algorithms**
+
+For the stationary smoothers, we're each time choosing one of the defined functions below either to be used on its own for comparison or to use it as the smoother in our Multigrid implementation.
 """
 
 # ╔═╡ bbfb0164-5771-11eb-09c0-8d8bbf8e7434
@@ -272,7 +275,7 @@ begin
 		n == 2 && return repeat(grid, n, n)	# size(grid) == (1,1)
 		g = zeros((n,n))
 		for i=2:n-1, j=2:n-1
-			g[i, j] = 0.5*grid[i÷2, j÷2]
+			g[i, j] = grid[i÷2, j÷2]
 		end
 		return g
 	end
@@ -368,7 +371,7 @@ end ;
 
 # ╔═╡ 7d83e592-585a-11eb-2a5d-1f8c8fb2fd8b
 # Multigrid V-cycle
-@elapsed u₂ = multigrid(A, b, u, 3, ω, 1e-30, 1)
+@elapsed u₂ = multigrid(A, b, u, 3, ω, 1e-30, 1, injection, linearize)
 
 # ╔═╡ 046db82e-585d-11eb-158b-c760258806ab
 md"""
@@ -385,7 +388,7 @@ begin
 end
 
 # ╔═╡ b69d80da-5856-11eb-1fae-5fdf08297723
-@show "Error norm gain: $(round(fastr, digits=5))"
+@show "Error norm gain: $(round(abs(fastr), digits=5))"
 
 # ╔═╡ 421e9880-585f-11eb-1a4a-db98dbf494d6
 md"""
@@ -415,7 +418,7 @@ begin
 end
 
 # ╔═╡ 870b1224-5860-11eb-3d77-1d6a0bc7f8a6
-md"""From the graphs shown above and below, we can tell that even when both obtained solutions seem to be somewhat similar *(Multigrid's being dimmer which by the graph's legend means a **nearer to 0 error**)*, the solutions difference distribution tell us that the iterative method had a bit of a struggle polishing the *lowest frequencies* in only 50 iterations.
+md"""From the graphs shown above and below, we can tell that the multigrid's solution is by far a better solution than the iterative JOR solver *(Multigrid's being dimmer and softer which by the graph's legend means a **nearer to 0 error**)*. Also, the solutions difference distribution tells us even more about the struggle that Jacobi-Over-Relaxation method had trying to polish the *lowest frequencies* in only 50 iterations.
 """
 
 # ╔═╡ 71deb1c0-5843-11eb-315c-b9cee350e560
@@ -430,8 +433,21 @@ end
 
 # ╔═╡ 32f264d2-584a-11eb-01ba-3b4ea67003df
 md"""**V-cycle vs W-cycle**
+"""
 
+# ╔═╡ d27ae6f8-586d-11eb-1ed3-1da566271a73
+html"""
+<center>
+<img width="75%" src="https://d3i71xaburhd42.cloudfront.net/5dd2565fee1cdda8cf9ba444262f3ba3b5323219/73-Figure4.8-1.png"/>
+</center>
+"""
+
+# ╔═╡ d25069b4-5874-11eb-3876-dd2e4b0cce2a
+md"""
 We'll now proceed to compare the convergence of the V-cycle and the W-cycle variants of the multigrid solver for various $\sigma$ and $n$ levels for the problem operator $A₁(\sigma, n)$."""
+
+# ╔═╡ b1ee0492-5874-11eb-35ef-27791afce7a1
+md"""**1-** $n = 1024\ ,\ \sigma = 0.7$"""
 
 # ╔═╡ e70c7750-5863-11eb-38ea-157cc0b19d9b
 begin
@@ -451,14 +467,23 @@ end ;
 # Multigrid 2-steps W-cycle
 @elapsed uⱼ₁ = multigrid(A₁₁, bₙ₁, uₙ₁, 3, ω, 1e-30, 2)
 
+# ╔═╡ 624f194a-5873-11eb-1ed4-112551856dfe
+md"""
+By just executing both solvers, we can already notice the difference in time between both solvers. The difference shown above actually makes sense: Our W-cycle is a **2-step** one on a **3-level** multigrid, which means it takes the exact form of a W, then we're executing the same number of iterations but **twice**. This gets reflected by the *more-than-twice* execution time we have with the W-cycle, compared to the V-cycle.
+"""
+
 # ╔═╡ ebf9da62-586a-11eb-0386-7576e50ef520
 # Comparing solutions error rates
 begin
 	eᵢ₁ 	= bₙ₁ - A₁₁(n)*uᵢ₁ 			# V-cycle solution error
 	eⱼ₁ 	= bₙ₁ - A₁₁(n)*uⱼ₁ 			# W-cycle solution error
 	fastr₁ 	= norm(eᵢ₁, 2) - norm(eⱼ₁, 2)
-	@show "||eᵢ₁|| $(fastr₁ < 0 ? '<' : '>') ||eⱼ₁||"
+	@show "||eᵥ|| $(fastr₁ < 0 ? '<' : '>') ||eᵪ||"
 end
+
+# ╔═╡ 04354736-5877-11eb-0a11-dd87cbdf782e
+md"""From here, we can confirm that the W-cycle was actually worth the wait, as it did help smoothing out the error in a more extreme way than the V-cycle did.
+"""
 
 # ╔═╡ 4a51a37e-586b-11eb-2304-a73fbb512158
 @show "Error norm gain: $(round(fastr₁, digits=5))"
@@ -466,12 +491,12 @@ end
 # ╔═╡ 69ca47ba-586b-11eb-18a6-8128dd4670ce
 # Visualizing solution errors
 begin
-	# Jacobi-OR
+	# V-cycle
 	gᵢ₁ 	= reshape(eᵢ₁, (n₁, n₁))' |> Array
 	htmpᵢ₁ 	= heatmap(1:n₁, 1:n₁, gᵢ₁, fmt=:png, ratio=1,
 						title="V-cycle - n = 1024 - σ = 0.7")
 
-	# Multigrid V-cycle
+	# W-cycle
 	gⱼ₁ 	= reshape(eⱼ₁, (n₁, n₁))' |> Array
 	htmpⱼ₁ 	= heatmap(1:n₁, 1:n₁, gⱼ₁, fmt=:png, ratio=1,
 						title="W-cycle - n = 1024 - σ = 0.7")
@@ -479,23 +504,367 @@ begin
 	plot(htmpᵢ₁, htmpⱼ₁, layout=(1,2), size=(1000,500))
 end
 
-# ╔═╡ 5f94664a-586b-11eb-0ed7-c92bb9aa59e0
+# ╔═╡ 3944a45c-5873-11eb-1af2-65ad1dbc48df
+md"""**2-** $n = 1024\ ,\ \sigma = 7$"""
 
+# ╔═╡ c4d86ad0-586e-11eb-3296-8f61deff1e47
+begin
+	σ₂ 	= 7.
+	A₁₂ = A₁(σ₂)
+	uᵢ₂ = multigrid(A₁₂, bₙ₁, uₙ₁, 3, ω, 1e-30, 1)		# Multigrid V-cycle
+	uⱼ₂ = multigrid(A₁₂, bₙ₁, uₙ₁, 3, ω, 1e-30, 2)		# Multigrid W-cycle
+	eᵢ₂ 	= bₙ₁ - A₁₂(n)*uᵢ₂ 							# V-cycle solution error
+	eⱼ₂ 	= bₙ₁ - A₁₂(n)*uⱼ₂ 							# W-cycle solution error
+	fastr₂ 	= norm(eᵢ₂, 2) - norm(eⱼ₂, 2)
+end ;
+
+# ╔═╡ 1037e1a6-5872-11eb-0820-bd41a05d1af1
+@show "||eᵥ|| $(fastr₂ < 0 ? '<' : '>') ||eᵪ||"
+
+# ╔═╡ f0e013b0-586e-11eb-2457-f917877375cb
+@show "Error norm gain: $(round(abs(fastr₂), digits=5))"
+
+# ╔═╡ 18c95184-5871-11eb-0c6e-d3e710f51be2
+@show "Error norm gain - V-cycle: $(round(abs(norm(eᵢ₂, 2) - norm(eᵢ₁, 2)), digits=5))"
+
+# ╔═╡ 362bda12-5871-11eb-3c16-8d53b233a01d
+@show "Error norm gain - W-cycle: $(round(abs(norm(eⱼ₂, 2) - norm(eⱼ₁, 2)), digits=5))"
+
+# ╔═╡ 41c925c2-5877-11eb-2e1d-af5b5f0cd74a
+md"""
+Increasing $\sigma$ by a factor of x10 lead both solvers to better solutions relatively, but it did have the same effect on both of them as the error gain of the W-cycle over the V-cycle is still nearly the same.
+"""
+
+# ╔═╡ 3a56d20a-5875-11eb-03c0-a5b112d19efe
+md"""**3-** $n = 1024\ ,\ \sigma = 70$"""
+
+# ╔═╡ 3a5cb224-5875-11eb-2c1b-97436009b686
+begin
+	σ₃ 	= 70.
+	A₁₃ = A₁(σ₃)
+	uᵢ₃ = multigrid(A₁₃, bₙ₁, uₙ₁, 3, ω, 1e-30, 1)		# Multigrid V-cycle
+	uⱼ₃ = multigrid(A₁₃, bₙ₁, uₙ₁, 3, ω, 1e-30, 2)		# Multigrid W-cycle
+	eᵢ₃ 	= bₙ₁ - A₁₃(n)*uᵢ₃ 							# V-cycle solution error
+	eⱼ₃ 	= bₙ₁ - A₁₃(n)*uⱼ₃ 							# W-cycle solution error
+	fastr₃ 	= norm(eᵢ₃, 2) - norm(eⱼ₃, 2)
+end ;
+
+# ╔═╡ 3a6569f0-5875-11eb-344d-5bf556e0aa8d
+@show "||eᵥ|| $(fastr₃ < 0 ? '<' : '>') ||eᵪ||"
+
+# ╔═╡ 3a668812-5875-11eb-326f-87f50db349c8
+@show "Error norm gain: $(round(abs(fastr₃), digits=5))"
+
+# ╔═╡ 3a784ba6-5875-11eb-1979-7d9a299ea243
+@show "Error norm gain - V-cycle: $(round(abs(norm(eᵢ₃, 2) - norm(eᵢ₂, 2)), digits=5))"
+
+# ╔═╡ 3a805846-5875-11eb-0f01-071787fe43fc
+@show "Error norm gain - W-cycle: $(round(abs(norm(eⱼ₃, 2) - norm(eⱼ₂, 2)), digits=5))"
 
 # ╔═╡ 446a6f40-586b-11eb-282a-f94ee14269a2
+md"""
+Increasing $\sigma$ by a factor of x100 lead both solvers to better solutions, and this time, it started showing its effect on the W side of things more than on the V-cycle's side. But still, it also increased the error-wise gain of the V-cycle multigrid solver too.
+"""
 
+# ╔═╡ 1832d306-5878-11eb-311c-11fabb6bbb2c
+md"""**4-** $n = 256\ ,\ \sigma = 7$"""
 
-# ╔═╡ edf8d17e-586a-11eb-2032-4743e1a4ccaf
+# ╔═╡ 18391a04-5878-11eb-3287-57163da7c4f8
+begin
+	n₂ 	= 256
+	h₂ 	= 1 / n₂
+	uₙ₂ = zeros(n₂^2)
+	bₙ₂ = [sin(2π*f*i*j) for i=0:h₂:1-h₂ for j=0:h₂:1-h₂]
+	uᵢ₄ = multigrid(A₁₂, bₙ₂, uₙ₂, 3, ω, 1e-30, 1)		# Multigrid V-cycle
+	uⱼ₄ = multigrid(A₁₂, bₙ₂, uₙ₂, 3, ω, 1e-30, 2)		# Multigrid W-cycle
+	eᵢ₄ 	= bₙ₂ - A₁₂(n₂)*uᵢ₄ 						# V-cycle solution error
+	eⱼ₄ 	= bₙ₂ - A₁₂(n₂)*uⱼ₄ 						# W-cycle solution error
+	fastr₄ 	= norm(eᵢ₄, 2) - norm(eⱼ₄, 2)
+end ;
 
+# ╔═╡ 183e589a-5878-11eb-3584-b37c8b96fb45
+@show "||eᵥ|| $(fastr₄ < 0 ? '<' : '>') ||eᵪ||"
 
-# ╔═╡ ee1653e0-586a-11eb-132c-01f49c5a1fa9
+# ╔═╡ 18484de4-5878-11eb-22f5-f37516a22b29
+@show "Error norm gain: $(round(abs(fastr₄), digits=5))"
 
+# ╔═╡ 184a1dc4-5878-11eb-3513-9fe97c35da4c
+@show "Error norm gain - V-cycle: $(round(abs(norm(eᵢ₄, 2) - norm(eᵢ₂, 2)), digits=5))"
 
-# ╔═╡ ee2a8d9c-586a-11eb-3ae0-47158f69bbc0
+# ╔═╡ 1854a65c-5878-11eb-2473-b7acbd68e216
+@show "Error norm gain - W-cycle: $(round(abs(norm(eⱼ₄, 2) - norm(eⱼ₂, 2)), digits=5))"
 
+# ╔═╡ 1855c320-5878-11eb-0468-b76ec811f012
+md"""
+Decreasing $n$ by a factor of x4 lead both solvers as usual to **better solutions**, this time, having a **huge effect on the V-cycle**'s side compared to the W-cycle as the difference between the solutions is converging to none. Still, the latter is the better solver on these simulation settings.
+
+As for the effect this had on improving the approximation, this was expected: Actually, as we go down in the grid's size, we're releasing the multigrid from the burden of having to interpolate on bigger grids *(the ones that we got rid of when we divided the fine size by 4)* which means the solver now is **less error-prone** than on the bigger grid case. Also, let's not forget that by doing such, we're giving the multigrid the opportunity to **spend the same number of iterations but on coarser grids**, this helps it converge faster than before. And this is exactly why we witnessed these huge evolutions on the approximation error.
+"""
+
+# ╔═╡ b03feb94-587c-11eb-04b3-33363338be39
+md"""**5-** $n = 32\ ,\ \sigma = 7$"""
+
+# ╔═╡ b043fe28-587c-11eb-31a6-d9199b0a3231
+begin
+	n₃ 	= 32
+	h₃ 	= 1 / n₃
+	uₙ₃ = zeros(n₃^2)
+	bₙ₃ = [sin(2π*f*i*j) for i=0:h₃:1-h₃ for j=0:h₃:1-h₃]
+	uᵢ₅ = multigrid(A₁₂, bₙ₃, uₙ₃, 3, ω, 1e-30, 1)		# Multigrid V-cycle
+	uⱼ₅ = multigrid(A₁₂, bₙ₃, uₙ₃, 3, ω, 1e-30, 2)		# Multigrid W-cycle
+	eᵢ₅ 	= bₙ₃ - A₁₂(n₃)*uᵢ₅ 						# V-cycle solution error
+	eⱼ₅ 	= bₙ₃ - A₁₂(n₃)*uⱼ₅ 						# W-cycle solution error
+	fastr₅ 	= norm(eᵢ₅, 2) - norm(eⱼ₅, 2)
+end ;
+
+# ╔═╡ b045b128-587c-11eb-1064-8166fe875bd9
+@show "||eᵥ|| $(fastr₅ < 0 ? '<' : '>') ||eᵪ||"
+
+# ╔═╡ b053d5a2-587c-11eb-0fcf-053648eb60d9
+@show "Error norm gain: $(round(abs(fastr₅), digits=5))"
+
+# ╔═╡ b0551278-587c-11eb-174f-cf692bcd0675
+@show "Error norm gain - V-cycle: $(round(abs(norm(eᵢ₅, 2) - norm(eᵢ₂, 2)), digits=5))"
+
+# ╔═╡ b060aa6e-587c-11eb-3ac9-5935786e20c1
+@show "Error norm gain - W-cycle: $(round(abs(norm(eⱼ₅, 2) - norm(eⱼ₂, 2)), digits=5))"
+
+# ╔═╡ b061db8a-587c-11eb-312a-fd93e66e3039
+md"""
+On the abstract side of the story, as the theory states, the W-cycle is still a better solver than the V-cycle. But as we're still approaching coarser grid sizes *(here dividing by a factor of x32)*, the fine-tuning is happening on even coarser grids *(with a size of 4x4 in these settings)* so increasing the number of iterations or further smoothing out the approximation n-times *(as it's the case for the W-cycle)* **isn't going to make any difference**.
+
+**Restriction Operators**
+
+Trying to visualize the workings of the Multigrid solver, we always stumble on the matrix transformations we're using to interpolate the grid we have to a coarser one *(restriction)* or to a finer one *(prolongation)*. As we already created these 3 operators *(see code in the solvers implementation part)*, we're going to compare them according to what they give in term of approximation error.
+
+For this benchmarking, we're conducting the $n=1024$ , $\sigma=7$ simulation. We're also going to use the **4-level 2-steps W-cycle** multigrid equipped with the **linearization** prolongation operator for better results and more complexity to be able to well-assess the performance difference between all runs.
+"""
+
+# ╔═╡ 5cfbb91a-5881-11eb-39ed-817b986b9832
+# Restriction by Injection
+@elapsed uⱼ₆ = multigrid(A₁₂, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, injection, linearize)
+
+# ╔═╡ 5d1657a0-5881-11eb-2784-0d213e722e7f
+# Restriction by Halfweighting
+@elapsed uⱼ₇ = multigrid(A₁₂, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, halfweight, linearize)
+
+# ╔═╡ 5d2bbe10-5881-11eb-3b4c-3984a432b8f1
+# Restriction by Fullweighting
+@elapsed uⱼ₈ = multigrid(A₁₂, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, fullweight, linearize)
+
+# ╔═╡ 1a70c16a-5886-11eb-188e-317a78df7b25
+md"""
+From the execution-times of the 3 variants, we can conclude that thanks to Julia's loops optimization, we can use the 3 restriction operators interchangeably without any loss in performance.
+"""
+
+# ╔═╡ 5d41df08-5881-11eb-3abc-6f4480396028
+# Comparing solutions error rates
+begin
+	eⱼ₆ 	= bₙ₁ - A₁₂(n)*uⱼ₆ 			# Injection solution error - eᵢ
+	eⱼ₇ 	= bₙ₁ - A₁₂(n)*uⱼ₇ 			# Halfweighting solution error - eₕ
+	eⱼ₈ 	= bₙ₁ - A₁₂(n)*uⱼ₈ 			# Fullweighting solution error - eᵩ
+	fastr₆₇ = norm(eⱼ₆, 2) - norm(eⱼ₇, 2)
+	fastr₆₈ = norm(eⱼ₆, 2) - norm(eⱼ₈, 2)
+	fastr₇₈ = norm(eⱼ₇, 2) - norm(eⱼ₈, 2)
+end ;
+
+# ╔═╡ 5afc977c-5881-11eb-3629-ef6b8f815404
+@show "||eₕ|| $(fastr₇₈ < 0 ? '<' : '>') ||eᵩ||"
+
+# ╔═╡ 4c5d29e0-5887-11eb-13a8-3fc1fc4ff05e
+@show "Error norm gain - HW/FW: $(round(abs(fastr₇₈), digits=5))"
 
 # ╔═╡ dac43802-586a-11eb-3b90-8fbf23bfb42b
+# Visualizing solution errors
+begin
+	gⱼ₃ 	= reshape(eⱼ₇ - eⱼ₈, (n₁, n₁))' |> Array
+	htmpⱼ₃ 	= heatmap(1:n₁, 1:n₁, gⱼ₃, fmt=:png, ratio=1,
+						title="Approx. Difference - Halfweighting/Fullweighting")
+	sfcⱼ₃ 	= surface(gⱼ₃, fmt=:png, ratio=1, legend=false,
+						title="Approx. Difference Distribution")
+	plot(htmpⱼ₃, sfcⱼ₃, layout=(1,2), size=(1000,500))
+end
 
+# ╔═╡ 5ad1d1f4-5881-11eb-2c3c-177e2beef14f
+@show "||eᵢ|| $(fastr₆₇ < 0 ? '<' : '>') ||eₕ||"
+
+# ╔═╡ 3790a728-5887-11eb-0d61-651e924d1035
+@show "Error norm gain - I/HW: $(round(abs(fastr₆₇), digits=5))"
+
+# ╔═╡ 88d86508-5887-11eb-00b8-79cb3b213e22
+# Visualizing solution errors
+begin
+	gⱼ₂ 	= reshape(eⱼ₆ - eⱼ₇, (n₁, n₁))' |> Array
+	htmpⱼ₂ 	= heatmap(1:n₁, 1:n₁, gⱼ₂, fmt=:png, ratio=1,
+						title="Approx. Difference - Injection/Halfweighting")
+	sfcⱼ₂ 	= surface(gⱼ₂, fmt=:png, ratio=1, legend=false,
+						title="Approx. Difference Distribution")
+	plot(htmpⱼ₂, sfcⱼ₂, layout=(1,2), size=(1000,500))
+end
+
+# ╔═╡ 5ae6f7da-5881-11eb-00eb-732d1dfcf26f
+@show "||eᵢ|| $(fastr₆₈ < 0 ? '<' : '>') ||eᵩ||"
+
+# ╔═╡ 494121ac-5887-11eb-1264-7155e70d3f0f
+@show "Error norm gain I/FW: $(round(abs(fastr₆₈), digits=5))"
+
+# ╔═╡ 92df302a-5889-11eb-2eeb-e7122d1d6782
+md"""
+What we learn from these results is that as long as we're not changing the local values of the solution matrices, there's no problem coarsening the grid some more. Which is in a bit the opposite result of the comparison between the *linearization* and the direct *enlargement* prolongations operators. This may be explained by the fact that when using the multigrid solver, we're trying to port our problem into coarser grids to solve it on that level, so if we're changing the values **even if it's a local-aware change** *(as it's the case for halfweighting and even more in fullweighting)*, we may be **changing the target distribution** and by such furthering our path to the optimal minima.
+
+**Anisotropic Problem Resolution**
+
+We already constructed the Anisotropic problem PDE $(P_2)$ in the PDE's & Operators Construction part of the document, so we're going to directly try to solve it using our 4-level 2-step W-cycle multigrid equipped by the injection & linearization interpolation operators.
+
+**1-** $ϵ = 0.3$
+"""
+
+# ╔═╡ 9397065a-5889-11eb-0de5-5b56807adc26
+begin
+	ϵ₁ 	= 0.3
+	A₂₁ = A₂(ϵ₁)
+	uⱼ₉ = multigrid(A₂₁, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, injection, linearize)
+	eⱼ₉ = bₙ₁ - A₂₁(n₁)*uⱼ₉
+end ;
+
+# ╔═╡ 93bfc128-5889-11eb-3009-5b8ca0ec96d8
+# Visualizing solution errors
+begin
+	gⱼ₄ 	= reshape(eⱼ₉, (n₁, n₁))' |> Array
+	htmpⱼ₄ 	= heatmap(1:n₁, 1:n₁, gⱼ₄, fmt=:png, ratio=1,
+						title="Approx. Error - σ = 0.3")
+	sfcⱼ₄ 	= surface(gⱼ₄, fmt=:png, ratio=1, legend=false,
+						title="Approx. Error Distribution")
+	plot(htmpⱼ₄, sfcⱼ₄, layout=(1,2), size=(1000,500))
+end
+
+# ╔═╡ 692663c8-5890-11eb-2667-53cabbb41ef2
+md"""**2-** $ϵ = 3$"""
+
+# ╔═╡ 7d33ca6c-5891-11eb-0f78-d12c4db73a43
+begin
+	ϵ₂ 		= 3.
+	A₂₂ 	= A₂(ϵ₂)
+	uⱼ₁₀ 	= multigrid(A₂₂, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, injection, linearize)
+	eⱼ₁₀ 	= bₙ₁ - A₂₂(n₁)*uⱼ₁₀
+end ;
+
+# ╔═╡ 7d365d0e-5891-11eb-048a-d3cfdbce0aba
+# Visualizing solution errors
+begin
+	gⱼ₅ 	= reshape(eⱼ₁₀, (n₁, n₁))' |> Array
+	htmpⱼ₅ 	= heatmap(1:n₁, 1:n₁, gⱼ₅, fmt=:png, ratio=1,
+						title="Approx. Error - σ = 3")
+	sfcⱼ₅ 	= surface(gⱼ₅, fmt=:png, ratio=1, legend=false,
+						title="Approx. Error Distribution")
+	plot(htmpⱼ₅, sfcⱼ₅, layout=(1,2), size=(1000,500))
+end
+
+# ╔═╡ 22af0768-5892-11eb-3954-41099e721288
+md"""**3-** $ϵ = 30$"""
+
+# ╔═╡ 22b4d472-5892-11eb-091f-553428e2dc6a
+begin
+	ϵ₃ 		= 30.
+	A₂₃ 	= A₂(ϵ₃)
+	uⱼ₁₁ 	= multigrid(A₂₃, bₙ₁, uₙ₁, 4, ω, 1e-30, 2, injection, linearize)
+	eⱼ₁₁ 	= bₙ₁ - A₂₃(n₁)*uⱼ₁₁
+end ;
+
+# ╔═╡ 22bf4c40-5892-11eb-3e51-075e4309d973
+# Visualizing solution errors
+begin
+	gⱼ₆ 	= reshape(eⱼ₁₁, (n₁, n₁))' |> Array
+	htmpⱼ₆ 	= heatmap(1:n₁, 1:n₁, gⱼ₆, fmt=:png, ratio=1,
+						title="Approx. Error - σ = 30")
+	sfcⱼ₆ 	= surface(gⱼ₆, fmt=:png, ratio=1, legend=false,
+						title="Approx. Error Distribution")
+	plot(htmpⱼ₆, sfcⱼ₆, layout=(1,2), size=(1000,500))
+end
+
+# ╔═╡ 93d3d1dc-5889-11eb-3f54-1319a2e33867
+md"""
+Trying to analyze the figures we get from the 3 simulations we ran, we can identify one main problem which is the **non-convergence on the pure directions** being X and Y axis of the vector space. Also, when we look into the difference between the first and the second graphs, we may conclude that the error is also *alternating from one direction into the other* while moving through intervals of values of $\epsilon$.
+
+This is actually caused by the nature of the **deformation** that the PDE applies to the vector space. As the equation $P_2$ states, differentiating the solution on the X-axis by one unit will directly force differentiating it by $\epsilon$ units onto the Y-axis.
+
+$-\frac{\partial^2 u(x,y)}{∂x²} - \epsilon \frac{\partial^2 u(x,y)}{∂y²} = f(x,y)\ \ \ \ (P_2)$
+
+While this may sound not-harmful at all for our solvers, what we can guess is causing this issue, is actually our coarsening strategies. They're **based on equally distributed spaces** and that's why they're affecting **each one of the neighbors equal coefficients** when using neighbors-based coarsening. And this is the exact reason why the injection is yielding the best restriction therefore the best approximation among all the other operators on this problem.
+
+One new way we can think of solving this problem, is to try to create a *halfweighting-like version of a restriction operator*, but **taking into account the $\epsilon$ parameter for the Y direction**.
+"""
+
+# ╔═╡ 9453db7c-5889-11eb-0a4f-63e7ef7bdb6d
+begin
+	"""
+		ϵ_halfweight(ϵ, grid)
+
+	A function that returns the ϵ-halfweighting of the grid taken as input.
+	"""
+	function ϵ_halfweight(ϵ, grid)
+		g = Float64.(grid)
+		for i=2:2:size(grid,1)-1, j=2:2:size(grid,2)-1
+			g[i,j] = g[i,j] / 2 - (
+				ϵ * g[i-1,j] + ϵ * g[i+1,j]
+				+ (1 - ϵ) * g[i,j-1] + (1 - ϵ) * g[i,j+1]) / 8
+		end
+		return injection(g)
+	end
+	
+	"""
+		ϵ_halfweight(ϵ)
+
+	A function that constructs the ϵ-halfweighting operator.
+	"""
+	ϵ_halfweight(ϵ) = grid -> ϵ_halfweight(ϵ, grid)
+	
+	"""
+		ϵ_linearize(ϵ, grid)
+
+	A function that returns the ϵ-linearization of the grid taken as input.
+	"""
+	function ϵ_linearize(ϵ, grid)
+		n = size(grid,1) * 2
+		n == 2 && return repeat(grid, n, n)
+		g = zeros((n,n))
+		for i=2:n-1, j=2:n-1
+			g[i, j] = (grid[Int(floor((i+1)/2)), Int(floor((j+1)/2))] 
+				+ grid[Int(ceil((i+1)/2)), Int(floor((j+1)/2))]) / 2*ϵ + (
+				grid[Int(floor((i+1)/2)), Int(ceil((j+1)/2))] 
+				+ grid[Int(ceil((i+1)/2)), Int(ceil((j+1)/2))]) / 2*(1-ϵ)
+		end
+		return g
+	end
+	
+	"""
+		ϵ_linearize(ϵ)
+
+	A function that constructs the ϵ-linearization operator.
+	"""
+	ϵ_linearize(ϵ) = grid -> ϵ_linearize(ϵ, grid)
+end ;
+
+# ╔═╡ 946796a8-5889-11eb-1ecf-05cc703365a8
+begin
+	uⱼ₁₂ = multigrid(A₂₁, bₙ₁, uₙ₁, 4, ω, 1e-30, 2,
+					 ϵ_halfweight(ϵ₁), ϵ_linearize(ϵ₁))
+	eⱼ₁₂ = bₙ₁ - A₂₁(n₁)*uⱼ₁₂
+end ;
+
+# ╔═╡ 96746de0-5889-11eb-155b-4961c27f065f
+# Visualizing solution errors
+begin
+	gⱼ₇ 	= reshape(eⱼ₁₂, (n₁, n₁))' |> Array
+	htmpⱼ₇ 	= heatmap(1:n₁, 1:n₁, gⱼ₇, fmt=:png, ratio=1,
+						title="Approx. Error - σ = 3")
+	sfcⱼ₇ 	= surface(gⱼ₇, fmt=:png, ratio=1, legend=false,
+						title="Approx. Error Distribution")
+	plot(htmpⱼ₇, sfcⱼ₇, layout=(1,2), size=(1000,500))
+end
+
+# ╔═╡ 968522d4-5889-11eb-2a74-39a374ed38ca
+norm(eⱼ₁₂, 2) - norm(eⱼ₉, 2)
 
 # ╔═╡ Cell order:
 # ╟─2bf55ba0-554e-11eb-1ba0-3723b6f49d8d
@@ -539,15 +908,69 @@ end
 # ╟─870b1224-5860-11eb-3d77-1d6a0bc7f8a6
 # ╠═71deb1c0-5843-11eb-315c-b9cee350e560
 # ╟─32f264d2-584a-11eb-01ba-3b4ea67003df
+# ╟─d27ae6f8-586d-11eb-1ed3-1da566271a73
+# ╟─d25069b4-5874-11eb-3876-dd2e4b0cce2a
+# ╟─b1ee0492-5874-11eb-35ef-27791afce7a1
 # ╠═e70c7750-5863-11eb-38ea-157cc0b19d9b
 # ╠═35ce219c-5869-11eb-39f9-577d4de271b1
 # ╠═5757f624-5869-11eb-3006-6fd9f81ba58c
+# ╟─624f194a-5873-11eb-1ed4-112551856dfe
 # ╠═ebf9da62-586a-11eb-0386-7576e50ef520
+# ╟─04354736-5877-11eb-0a11-dd87cbdf782e
 # ╟─4a51a37e-586b-11eb-2304-a73fbb512158
 # ╠═69ca47ba-586b-11eb-18a6-8128dd4670ce
-# ╠═5f94664a-586b-11eb-0ed7-c92bb9aa59e0
-# ╠═446a6f40-586b-11eb-282a-f94ee14269a2
-# ╠═edf8d17e-586a-11eb-2032-4743e1a4ccaf
-# ╠═ee1653e0-586a-11eb-132c-01f49c5a1fa9
-# ╠═ee2a8d9c-586a-11eb-3ae0-47158f69bbc0
+# ╟─3944a45c-5873-11eb-1af2-65ad1dbc48df
+# ╠═c4d86ad0-586e-11eb-3296-8f61deff1e47
+# ╟─1037e1a6-5872-11eb-0820-bd41a05d1af1
+# ╟─f0e013b0-586e-11eb-2457-f917877375cb
+# ╟─18c95184-5871-11eb-0c6e-d3e710f51be2
+# ╟─362bda12-5871-11eb-3c16-8d53b233a01d
+# ╟─41c925c2-5877-11eb-2e1d-af5b5f0cd74a
+# ╟─3a56d20a-5875-11eb-03c0-a5b112d19efe
+# ╠═3a5cb224-5875-11eb-2c1b-97436009b686
+# ╟─3a6569f0-5875-11eb-344d-5bf556e0aa8d
+# ╟─3a668812-5875-11eb-326f-87f50db349c8
+# ╟─3a784ba6-5875-11eb-1979-7d9a299ea243
+# ╟─3a805846-5875-11eb-0f01-071787fe43fc
+# ╟─446a6f40-586b-11eb-282a-f94ee14269a2
+# ╟─1832d306-5878-11eb-311c-11fabb6bbb2c
+# ╠═18391a04-5878-11eb-3287-57163da7c4f8
+# ╟─183e589a-5878-11eb-3584-b37c8b96fb45
+# ╟─18484de4-5878-11eb-22f5-f37516a22b29
+# ╟─184a1dc4-5878-11eb-3513-9fe97c35da4c
+# ╟─1854a65c-5878-11eb-2473-b7acbd68e216
+# ╟─1855c320-5878-11eb-0468-b76ec811f012
+# ╟─b03feb94-587c-11eb-04b3-33363338be39
+# ╠═b043fe28-587c-11eb-31a6-d9199b0a3231
+# ╟─b045b128-587c-11eb-1064-8166fe875bd9
+# ╟─b053d5a2-587c-11eb-0fcf-053648eb60d9
+# ╟─b0551278-587c-11eb-174f-cf692bcd0675
+# ╟─b060aa6e-587c-11eb-3ac9-5935786e20c1
+# ╟─b061db8a-587c-11eb-312a-fd93e66e3039
+# ╠═5cfbb91a-5881-11eb-39ed-817b986b9832
+# ╠═5d1657a0-5881-11eb-2784-0d213e722e7f
+# ╠═5d2bbe10-5881-11eb-3b4c-3984a432b8f1
+# ╟─1a70c16a-5886-11eb-188e-317a78df7b25
+# ╠═5d41df08-5881-11eb-3abc-6f4480396028
+# ╟─5afc977c-5881-11eb-3629-ef6b8f815404
+# ╟─4c5d29e0-5887-11eb-13a8-3fc1fc4ff05e
 # ╠═dac43802-586a-11eb-3b90-8fbf23bfb42b
+# ╟─5ad1d1f4-5881-11eb-2c3c-177e2beef14f
+# ╟─3790a728-5887-11eb-0d61-651e924d1035
+# ╠═88d86508-5887-11eb-00b8-79cb3b213e22
+# ╟─5ae6f7da-5881-11eb-00eb-732d1dfcf26f
+# ╟─494121ac-5887-11eb-1264-7155e70d3f0f
+# ╟─92df302a-5889-11eb-2eeb-e7122d1d6782
+# ╠═9397065a-5889-11eb-0de5-5b56807adc26
+# ╠═93bfc128-5889-11eb-3009-5b8ca0ec96d8
+# ╟─692663c8-5890-11eb-2667-53cabbb41ef2
+# ╠═7d33ca6c-5891-11eb-0f78-d12c4db73a43
+# ╠═7d365d0e-5891-11eb-048a-d3cfdbce0aba
+# ╟─22af0768-5892-11eb-3954-41099e721288
+# ╠═22b4d472-5892-11eb-091f-553428e2dc6a
+# ╠═22bf4c40-5892-11eb-3e51-075e4309d973
+# ╟─93d3d1dc-5889-11eb-3f54-1319a2e33867
+# ╠═9453db7c-5889-11eb-0a4f-63e7ef7bdb6d
+# ╠═946796a8-5889-11eb-1ecf-05cc703365a8
+# ╠═96746de0-5889-11eb-155b-4961c27f065f
+# ╠═968522d4-5889-11eb-2a74-39a374ed38ca
