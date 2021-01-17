@@ -17,6 +17,15 @@ md"""
 ## Notebook: Geometric multigrid for 2D-PDE's
 """
 
+# ╔═╡ f893039e-58be-11eb-0c48-f9f499f6856d
+md"""
+Solving Partial Differential Equations has never been an easy task on mathematicians. In fact, in many cases it's even considered *impossible* to do with our current mathematics, so our best way to approach it is with numerical/computational approximations. It's this exact field that has specialized in solving PDE's numerically: *Using Iterative methods, Fourrier Transforms, Finite Differences, etc..*
+
+This project is about the **Multigrid methods** which are one of the most interesting assets of the numerical computing toolbox. We're also going to do some benchmarking of their performance regarding their iterative counterparts.
+
+Finally, to be able to start, we should first do the initial step of the numerical problem resolution framework: **Discretizing the PDE space**
+"""
+
 # ╔═╡ c33cb002-553d-11eb-31d3-3176668c06df
 md"""
 **Constructing the Laplacian 2D-operator and the Problems PDEs**
@@ -37,32 +46,18 @@ To construct the laplacian operator, we're using the **Kronecker product** with 
 # ╔═╡ 3bccede2-5849-11eb-21e0-37c579ac744e
 html"""
 <center>
-<img src="https://wikimedia.org/api/rest_v1/media/math/render/svg/cc2eec0b97a4fae13cb04ca7e06687bca1e2c120" alt="Kronecker Product">
+<img width="40%" src="https://i.stack.imgur.com/GYj20.png">
 <br/>
-<img src="https://wikimedia.org/api/rest_v1/media/math/render/svg/88948d4780e5d5fcb6e786d9d4c172ea78ceaabb" alt="Kronecker Product - explicit">
+<figure>
+<img src="data:image/png;base64,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" alt="Operator A for Au = f">
+<figcaption>$\Delta$ Operator Matrix</figcaption>
+</figure>
 </center>
 """
 
 # ╔═╡ 55b1fd86-584d-11eb-26f3-a739ab86bc4d
 md"""Regarding the Kronecker product, it is actually a **computationally expensive** operation, that is why we have to use **sparse matrices** for this extent. The use of sparse matrices is further supported by the sparsity factor of our Laplacian operator that isn't to be ignored.
 """
-
-# ╔═╡ 39a20744-584d-11eb-3376-614cc8c10fde
-html"""
-<center><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQd4MNLEj5e4xld1062xPxR-xPJ13Q7QXVQSg&usqp=CAU" alt="Operator A for Au = f"></center>
-"""
-
-# ╔═╡ ddb578ba-5858-11eb-3775-d3091ced2035
-# Dense Array representation taking all 4x5 memory spaces
-a = [3 0 0 0 0; 0 0 2 9 0; 0 0 0 0 1; 0 0 0 4 0]
-
-# ╔═╡ 678e0c28-5859-11eb-0bd5-b935bd90eed0
-# Number of Non-zeros of a
-nnz(sparse(a))
-
-# ╔═╡ f89b45ce-5858-11eb-2ae9-07c0a3e86908
-# Sparse Array variant taking only nnz(a) memory spaces
-sparse(a)
 
 # ╔═╡ 34f711ea-554f-11eb-342f-0358c848c965
 md"""We then need to transform our differential equation into a linear problem in the form of $\textbf{Au=f}$. For that, we only have to use the matrix $σI$ to then factorize the equation by $u(x,y)$.
@@ -92,11 +87,6 @@ $A_2=(\frac{\partial^2}{∂x²} - \epsilon \frac{\partial^2}{∂y²})I$
 
 # ╔═╡ be97faee-5532-11eb-1466-15d0f84888cf
 begin
-	"""
-		A₁(n::Int, σ::Float64)
-
-	A function that returns the Poisson probem's linear operator.
-	"""
 	function A₁(n::Int, σ::Float64)
 		∂² 	= Tridiagonal(ones(n-1), -2 * ones(n), ones(n-1))
 		∂x² = (n^2) * kron(sparse(∂²), I(n))	# kron is the Kronecker product
@@ -105,21 +95,6 @@ begin
 		return σ * I(n^2) - Δ
 	end
 	
-	"""
-		A₁(σ::Float64)
-
-	A function that returns the Poisson probem's linear operator.
-	This variant takes the σ value as input to construct an A₁ operator constructor that only takes the differentiable matrix dimension as input.
-	"""
-	function A₁(σ::Float64)
-		return n -> A₁(n, σ)
-	end
-
-	"""
-		A₂(n::Int, ϵ::Float64)
-
-	A function that returns the Anisotropic probem's linear operator.
-	"""
 	function A₂(n::Int, ϵ::Float64)
 		∂² 	= Tridiagonal(ones(n-1), -2 * ones(n), ones(n-1))
 		∂x² = (n^2) * kron(sparse(∂²), I(n))	# kron is the Kronecker product
@@ -127,36 +102,24 @@ begin
 		return - ∂x² - ϵ * ∂y²
 	end
 	
-	"""
-		A₂(ϵ::Float64)
-
-	A function that returns the Poisson probem's linear operator.
-	This variant takes the ϵ value as input to construct an A₂ operator constructor that only takes the differentiable matrix dimension as input.
-	"""
-	function A₂(ϵ::Float64)
-		return n -> A₂(n, ϵ)
-	end
+	A₁(σ::Float64) = n -> A₁(n, σ)
+	A₂(ϵ::Float64) = n -> A₂(n, ϵ)
 end ;
 
-# ╔═╡ d3ecaa6c-55ef-11eb-032c-632239a2f100
+# ╔═╡ 011d1544-58de-11eb-31bc-fb0262856677
 md"""
-Our grid boundaries are nulled by the equation's initial condition as $u(x,y)=0\ on\ \partial \Omega$ which means that we should reinject this boundaries condition after each smoothing operation.
+Before jumping to start modelling the solvers, we need first to iterate on the boundaries conditions. The PDE's we're solving are both using the same boundaries conditions $u(x,y) = 0$ on $∂Ω$ so we're just coding them in a function that will be called after each solver iteration to reinject the boundaries so that we don't miss the track of them.
 """
 
-# ╔═╡ 5c93118a-5555-11eb-14b1-872b186d3b0b
-"""
-    boundaries(grid::Array{Float64,2})
-
-A function that inject the boundaries conditions into the grid.
-To be used after each computing iteration towards convergence.
-"""
-function boundaries(grid)
-	g = copy(grid)
-	g[1, 1:end] 	.= 0
-	g[1:end, 1] 	.= 0
-	g[end, 1:end] 	.= 0
-	g[1:end, end] 	.= 0
-	return grid
+# ╔═╡ 3f38303e-58de-11eb-3bb5-ef7da4dfcce3
+function boundaries(v)
+	n = Int(sqrt(size(v,1)))
+	gridᵥ = reshape(v, (n, n))'
+	gridᵥ[1,:] .= 0
+	gridᵥ[end,:] .= 0
+	gridᵥ[:,1] .= 0
+	gridᵥ[:,end] .= 0
+	return gridᵥ |> transpose |> vec
 end ;
 
 # ╔═╡ e2f0fef8-584e-11eb-2f0c-49b4cb4009ba
@@ -167,57 +130,51 @@ For the stationary smoothers, we're each time choosing one of the defined functi
 """
 
 # ╔═╡ bbfb0164-5771-11eb-09c0-8d8bbf8e7434
-"""
-    Jacobi(A, b, u₀, ϵ, maxiter)
-
-Jacobi iterative smoother.
-"""
-function Jacobi(A, b, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10)
+function Jacobi(A, b, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10, bounds = false)
     u = u₀; n = Int(sqrt(size(A, 1))); iter = 0
 	M = Diagonal(A)
 	N = UnitLowerTriangular(A) + UnitUpperTriangular(A) - 2*I(n^2)
 	while iter <= maxiter
 		iter += 1
+		if bounds
+			u = boundaries(u)
+		end
 		u = inv(M) * (N*u + b)
-		(norm(b - A*u, 2) > ϵ) || break 	# Convergence check
+		(norm(b - A*u, 2) > ϵ) || break
 	end
 	return u
 end ;
 
 # ╔═╡ aafcba2a-5750-11eb-19e9-8fa5b1952b54
-"""
-    JOR(A, b, ω, u₀, ϵ, maxiter)
-
-Jacobi Over Relaxation iterative smoother.
-"""
-function JOR(A, b, ω, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10)
+function JOR(A, b, ω, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10, bounds = false)
     u = u₀; iter = 0
 	M = Diagonal(A) / ω
 	while iter <= maxiter
 		iter += 1
+		if bounds
+			u = boundaries(u)
+		end
 		r = b - A*u
 		z = inv(M) * r
 		u += z
-		(norm(r, 2) > ϵ) || break 			# Convergence check
+		(norm(r, 2) > ϵ) || break
 	end
 	return u
 end ;
 
 # ╔═╡ 25766a80-583e-11eb-1286-4945ee2b6fdb
-"""
-    SOR(A, b, ω, u₀, ϵ, maxiter)
-
-Successive Over Relaxation iterative smoother - Gauss Seidel variant.
-"""
-function SOR(A, b, ω, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10)
+function SOR(A, b, ω, u₀ = zeros(size(A, 1)), ϵ = 1e-7, maxiter = 10, bounds = false)
     u = u₀; n = Int(sqrt(size(A, 1))); iter = 0
 	D = Diagonal(A)
 	L = UnitLowerTriangular(A) - I(n^2)
 	U = UnitUpperTriangular(A) - I(n^2)
 	while iter <= maxiter
 		iter += 1
+		if bounds
+			u = boundaries(u)
+		end
 		u = inv(D + ω * L) * (ω * b - (ω * U + (ω-1) * D) * u)
-		(norm(b - A*u, 2) > ϵ) || break 	# Convergence check
+		(norm(b - A*u, 2) > ϵ) || break
 	end
 	return u
 end ;
@@ -271,8 +228,8 @@ begin
 
 	# Prolongation
 	function enlarge(grid)
-		n = size(grid,1) * 2 				# Working with square domains only
-		n == 2 && return repeat(grid, n, n)	# size(grid) == (1,1)
+		n = size(grid,1) * 2
+		n == 2 && return repeat(grid, n, n)
 		g = zeros((n,n))
 		for i=2:n-1, j=2:n-1
 			g[i, j] = grid[i÷2, j÷2]
@@ -281,8 +238,8 @@ begin
 	end
 	
 	function linearize(grid)
-		n = size(grid,1) * 2 				# Working with square domains only
-		n == 2 && return repeat(grid, n, n)	# size(grid) == (1,1)
+		n = size(grid,1) * 2
+		n == 2 && return repeat(grid, n, n)
 		g = zeros((n,n))
 		for i=2:n-1, j=2:n-1
 			g[i, j] = (grid[Int(floor((i+1)/2)), Int(floor((j+1)/2))] 
@@ -319,9 +276,9 @@ function multigrid(A, b, u, l, ω, ϵ=1e-7, steps=1,
 	n  = Int(sqrt(size(b, 1)))
 	Aₙ = A(n)
 	if l == 0
-		# We can use a direct solver instead
+		# We can also use a direct solver instead
 		# u = Array(Aₙ) \ b
-		u = JOR(Aₙ, b, ω, u, ϵ, iter)
+		u = JOR(Aₙ, b, ω, u, ϵ, iter)			# Resolution
 	else
 		u = JOR(Aₙ, b, ω, u, ϵ, iter)			# Pre-smoothing
 
@@ -367,7 +324,7 @@ end ;
 
 # ╔═╡ 5c49ed5e-585a-11eb-32d2-0ddecc88d963
 # Jacobi Over Relaxation
-@elapsed u₁ = JOR(A(n), b, ω, u, 1e-30, 50)
+@elapsed u₁ = JOR(A(n), b, ω, u, 1e-30, 50, true)
 
 # ╔═╡ 7d83e592-585a-11eb-2a5d-1f8c8fb2fd8b
 # Multigrid V-cycle
@@ -849,28 +806,35 @@ We finally obtained an operator that worked better and produced a cleaner approx
 
 The idea behind it is that as the Y-axis has got **stretched out by $\epsilon$**, then at every point of our grid, we'll have an $\epsilon$-contribution of one element, and $1-\epsilon/N$, $N$ being the number of neighbors around it that are taken into account.
 
-By such, we could decrease our norm by **55-units** on the euclidian norm of the vector space.
+By such, we could decrease our norm by **55-units** on the euclidian norm of the vector space."""
+
+# ╔═╡ e20eecfe-58ad-11eb-387c-ddbbbdeeedd1
+html"""
+<p style="text-align:right">
+<small>Rami KADER . HPC-AI20</small>
+-
+<small>Mines ParisTech</small>
+<br/>
+<small><small>Sat. Jan 16, 2021</small></small>
+</p>
 """
 
 # ╔═╡ Cell order:
 # ╟─2bf55ba0-554e-11eb-1ba0-3723b6f49d8d
+# ╟─f893039e-58be-11eb-0c48-f9f499f6856d
 # ╠═861aac40-552b-11eb-1151-6b74f5ed3de5
 # ╟─c33cb002-553d-11eb-31d3-3176668c06df
 # ╟─c68281e6-5539-11eb-10c0-fd665be52ae0
 # ╟─0e90ca56-5849-11eb-15b6-7f4419690f96
 # ╟─3bccede2-5849-11eb-21e0-37c579ac744e
 # ╟─55b1fd86-584d-11eb-26f3-a739ab86bc4d
-# ╟─39a20744-584d-11eb-3376-614cc8c10fde
-# ╠═ddb578ba-5858-11eb-3775-d3091ced2035
-# ╠═678e0c28-5859-11eb-0bd5-b935bd90eed0
-# ╠═f89b45ce-5858-11eb-2ae9-07c0a3e86908
 # ╟─34f711ea-554f-11eb-342f-0358c848c965
 # ╟─ba523a0e-554f-11eb-162f-8b6e6434d21c
 # ╟─4f335f12-573b-11eb-042c-a97c20dd929d
 # ╟─8a710356-573b-11eb-11b0-1b418859bb13
 # ╠═be97faee-5532-11eb-1466-15d0f84888cf
-# ╟─d3ecaa6c-55ef-11eb-032c-632239a2f100
-# ╠═5c93118a-5555-11eb-14b1-872b186d3b0b
+# ╟─011d1544-58de-11eb-31bc-fb0262856677
+# ╠═3f38303e-58de-11eb-3bb5-ef7da4dfcce3
 # ╟─e2f0fef8-584e-11eb-2f0c-49b4cb4009ba
 # ╠═bbfb0164-5771-11eb-09c0-8d8bbf8e7434
 # ╠═aafcba2a-5750-11eb-19e9-8fa5b1952b54
@@ -885,14 +849,14 @@ By such, we could decrease our norm by **55-units** on the euclidian norm of the
 # ╠═5c49ed5e-585a-11eb-32d2-0ddecc88d963
 # ╠═7d83e592-585a-11eb-2a5d-1f8c8fb2fd8b
 # ╟─046db82e-585d-11eb-158b-c760258806ab
-# ╠═6ce6509e-5783-11eb-1066-515dfad96fec
+# ╟─6ce6509e-5783-11eb-1066-515dfad96fec
 # ╟─b69d80da-5856-11eb-1fae-5fdf08297723
 # ╟─421e9880-585f-11eb-1a4a-db98dbf494d6
 # ╟─3a7b6bbe-5853-11eb-12d0-2d3907b68685
 # ╟─441ed93e-5860-11eb-07f0-f70c9720c8b5
-# ╠═0298049a-57b4-11eb-0cb2-e3524c90e250
+# ╟─0298049a-57b4-11eb-0cb2-e3524c90e250
 # ╟─870b1224-5860-11eb-3d77-1d6a0bc7f8a6
-# ╠═71deb1c0-5843-11eb-315c-b9cee350e560
+# ╟─71deb1c0-5843-11eb-315c-b9cee350e560
 # ╟─32f264d2-584a-11eb-01ba-3b4ea67003df
 # ╟─d27ae6f8-586d-11eb-1ed3-1da566271a73
 # ╟─d25069b4-5874-11eb-3876-dd2e4b0cce2a
@@ -901,10 +865,10 @@ By such, we could decrease our norm by **55-units** on the euclidian norm of the
 # ╠═35ce219c-5869-11eb-39f9-577d4de271b1
 # ╠═5757f624-5869-11eb-3006-6fd9f81ba58c
 # ╟─624f194a-5873-11eb-1ed4-112551856dfe
-# ╠═ebf9da62-586a-11eb-0386-7576e50ef520
+# ╟─ebf9da62-586a-11eb-0386-7576e50ef520
 # ╟─04354736-5877-11eb-0a11-dd87cbdf782e
 # ╟─4a51a37e-586b-11eb-2304-a73fbb512158
-# ╠═69ca47ba-586b-11eb-18a6-8128dd4670ce
+# ╟─69ca47ba-586b-11eb-18a6-8128dd4670ce
 # ╟─3944a45c-5873-11eb-1af2-65ad1dbc48df
 # ╠═c4d86ad0-586e-11eb-3296-8f61deff1e47
 # ╟─1037e1a6-5872-11eb-0820-bd41a05d1af1
@@ -940,24 +904,25 @@ By such, we could decrease our norm by **55-units** on the euclidian norm of the
 # ╠═5d41df08-5881-11eb-3abc-6f4480396028
 # ╟─5afc977c-5881-11eb-3629-ef6b8f815404
 # ╟─4c5d29e0-5887-11eb-13a8-3fc1fc4ff05e
-# ╠═dac43802-586a-11eb-3b90-8fbf23bfb42b
+# ╟─dac43802-586a-11eb-3b90-8fbf23bfb42b
 # ╟─5ad1d1f4-5881-11eb-2c3c-177e2beef14f
 # ╟─3790a728-5887-11eb-0d61-651e924d1035
-# ╠═88d86508-5887-11eb-00b8-79cb3b213e22
+# ╟─88d86508-5887-11eb-00b8-79cb3b213e22
 # ╟─5ae6f7da-5881-11eb-00eb-732d1dfcf26f
 # ╟─494121ac-5887-11eb-1264-7155e70d3f0f
 # ╟─92df302a-5889-11eb-2eeb-e7122d1d6782
-# ╠═9397065a-5889-11eb-0de5-5b56807adc26
-# ╠═93bfc128-5889-11eb-3009-5b8ca0ec96d8
+# ╟─9397065a-5889-11eb-0de5-5b56807adc26
+# ╟─93bfc128-5889-11eb-3009-5b8ca0ec96d8
 # ╟─692663c8-5890-11eb-2667-53cabbb41ef2
-# ╠═7d33ca6c-5891-11eb-0f78-d12c4db73a43
-# ╠═7d365d0e-5891-11eb-048a-d3cfdbce0aba
+# ╟─7d33ca6c-5891-11eb-0f78-d12c4db73a43
+# ╟─7d365d0e-5891-11eb-048a-d3cfdbce0aba
 # ╟─22af0768-5892-11eb-3954-41099e721288
-# ╠═22b4d472-5892-11eb-091f-553428e2dc6a
-# ╠═22bf4c40-5892-11eb-3e51-075e4309d973
+# ╟─22b4d472-5892-11eb-091f-553428e2dc6a
+# ╟─22bf4c40-5892-11eb-3e51-075e4309d973
 # ╟─93d3d1dc-5889-11eb-3f54-1319a2e33867
 # ╠═9453db7c-5889-11eb-0a4f-63e7ef7bdb6d
-# ╠═946796a8-5889-11eb-1ecf-05cc703365a8
-# ╠═96746de0-5889-11eb-155b-4961c27f065f
+# ╟─946796a8-5889-11eb-1ecf-05cc703365a8
+# ╟─96746de0-5889-11eb-155b-4961c27f065f
 # ╠═968522d4-5889-11eb-2a74-39a374ed38ca
 # ╟─b4194c8a-58a7-11eb-18af-ef8859041bd8
+# ╟─e20eecfe-58ad-11eb-387c-ddbbbdeeedd1
