@@ -732,7 +732,7 @@ end ;
 begin
 	gⱼ₄ 	= reshape(eⱼ₉, (n₁, n₁))' |> Array
 	htmpⱼ₄ 	= heatmap(1:n₁, 1:n₁, gⱼ₄, fmt=:png, ratio=1,
-						title="Approx. Error - σ = 0.3")
+						title="Approx. Error - ϵ = 0.3")
 	sfcⱼ₄ 	= surface(gⱼ₄, fmt=:png, ratio=1, legend=false,
 						title="Approx. Error Distribution")
 	plot(htmpⱼ₄, sfcⱼ₄, layout=(1,2), size=(1000,500))
@@ -754,7 +754,7 @@ end ;
 begin
 	gⱼ₅ 	= reshape(eⱼ₁₀, (n₁, n₁))' |> Array
 	htmpⱼ₅ 	= heatmap(1:n₁, 1:n₁, gⱼ₅, fmt=:png, ratio=1,
-						title="Approx. Error - σ = 3")
+						title="Approx. Error - ϵ = 3")
 	sfcⱼ₅ 	= surface(gⱼ₅, fmt=:png, ratio=1, legend=false,
 						title="Approx. Error Distribution")
 	plot(htmpⱼ₅, sfcⱼ₅, layout=(1,2), size=(1000,500))
@@ -776,7 +776,7 @@ end ;
 begin
 	gⱼ₆ 	= reshape(eⱼ₁₁, (n₁, n₁))' |> Array
 	htmpⱼ₆ 	= heatmap(1:n₁, 1:n₁, gⱼ₆, fmt=:png, ratio=1,
-						title="Approx. Error - σ = 30")
+						title="Approx. Error - ϵ = 30")
 	sfcⱼ₆ 	= surface(gⱼ₆, fmt=:png, ratio=1, legend=false,
 						title="Approx. Error Distribution")
 	plot(htmpⱼ₆, sfcⱼ₆, layout=(1,2), size=(1000,500))
@@ -805,9 +805,9 @@ begin
 	function ϵ_halfweight(ϵ, grid)
 		g = Float64.(grid)
 		for i=2:2:size(grid,1)-1, j=2:2:size(grid,2)-1
-			g[i,j] = g[i,j] / 2 - (
-				ϵ * g[i-1,j] + ϵ * g[i+1,j]
-				+ (1 - ϵ) * g[i,j-1] + (1 - ϵ) * g[i,j+1]) / 8
+			g[i,j] = ϵ * g[i,j] / 4 - (
+				g[i-1,j] + g[i+1,j]
+				+ (1 - ϵ/2) * g[i,j-1] + (1 - ϵ/2) * g[i,j+1]) / 8
 		end
 		return injection(g)
 	end
@@ -818,38 +818,13 @@ begin
 	A function that constructs the ϵ-halfweighting operator.
 	"""
 	ϵ_halfweight(ϵ) = grid -> ϵ_halfweight(ϵ, grid)
-	
-	"""
-		ϵ_linearize(ϵ, grid)
-
-	A function that returns the ϵ-linearization of the grid taken as input.
-	"""
-	function ϵ_linearize(ϵ, grid)
-		n = size(grid,1) * 2
-		n == 2 && return repeat(grid, n, n)
-		g = zeros((n,n))
-		for i=2:n-1, j=2:n-1
-			g[i, j] = (grid[Int(floor((i+1)/2)), Int(floor((j+1)/2))] 
-				+ grid[Int(ceil((i+1)/2)), Int(floor((j+1)/2))]) / 2*ϵ + (
-				grid[Int(floor((i+1)/2)), Int(ceil((j+1)/2))] 
-				+ grid[Int(ceil((i+1)/2)), Int(ceil((j+1)/2))]) / 2*(1-ϵ)
-		end
-		return g
-	end
-	
-	"""
-		ϵ_linearize(ϵ)
-
-	A function that constructs the ϵ-linearization operator.
-	"""
-	ϵ_linearize(ϵ) = grid -> ϵ_linearize(ϵ, grid)
 end ;
 
 # ╔═╡ 946796a8-5889-11eb-1ecf-05cc703365a8
 begin
-	uⱼ₁₂ = multigrid(A₂₁, bₙ₁, uₙ₁, 4, ω, 1e-30, 2,
-					 ϵ_halfweight(ϵ₁), ϵ_linearize(ϵ₁))
-	eⱼ₁₂ = bₙ₁ - A₂₁(n₁)*uⱼ₁₂
+	uⱼ₁₂ = multigrid(A₂₂, bₙ₁, uₙ₁, 4, ω, 1e-30, 2,
+					 ϵ_halfweight(ϵ₂), enlarge)
+	eⱼ₁₂ = bₙ₁ - A₂₂(n₁)*uⱼ₁₂
 end ;
 
 # ╔═╡ 96746de0-5889-11eb-155b-4961c27f065f
@@ -857,14 +832,25 @@ end ;
 begin
 	gⱼ₇ 	= reshape(eⱼ₁₂, (n₁, n₁))' |> Array
 	htmpⱼ₇ 	= heatmap(1:n₁, 1:n₁, gⱼ₇, fmt=:png, ratio=1,
-						title="Approx. Error - σ = 3")
+						title="ϵ-halfweighting - ϵ = 3")
 	sfcⱼ₇ 	= surface(gⱼ₇, fmt=:png, ratio=1, legend=false,
 						title="Approx. Error Distribution")
 	plot(htmpⱼ₇, sfcⱼ₇, layout=(1,2), size=(1000,500))
 end
 
 # ╔═╡ 968522d4-5889-11eb-2a74-39a374ed38ca
-norm(eⱼ₁₂, 2) - norm(eⱼ₉, 2)
+norm(eⱼ₁₂, 2) - norm(eⱼ₁₀, 2)
+
+# ╔═╡ b4194c8a-58a7-11eb-18af-ef8859041bd8
+md"""
+**And voilà!**
+
+We finally obtained an operator that worked better and produced a cleaner approximation with less error norm than the best operator among the restrictors tried on the anisotropic problem.
+
+The idea behind it is that as the Y-axis has got **stretched out by $\epsilon$**, then at every point of our grid, we'll have an $\epsilon$-contribution of one element, and $1-\epsilon/N$, $N$ being the number of neighbors around it that are taken into account.
+
+By such, we could decrease our norm by **55-units** on the euclidian norm of the vector space.
+"""
 
 # ╔═╡ Cell order:
 # ╟─2bf55ba0-554e-11eb-1ba0-3723b6f49d8d
@@ -974,3 +960,4 @@ norm(eⱼ₁₂, 2) - norm(eⱼ₉, 2)
 # ╠═946796a8-5889-11eb-1ecf-05cc703365a8
 # ╠═96746de0-5889-11eb-155b-4961c27f065f
 # ╠═968522d4-5889-11eb-2a74-39a374ed38ca
+# ╟─b4194c8a-58a7-11eb-18af-ef8859041bd8
